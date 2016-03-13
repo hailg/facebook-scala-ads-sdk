@@ -1,6 +1,6 @@
 # facebook-scala-ads-sdk
 
-##### IMPORTANT: This SDK is not Facebook's Official SDK. However, I used a lot of ideas from their Java and PHP SDK. This project still in devlopment, so please help contribute if you like it.
+##### IMPORTANT: This SDK is not Facebook's Official SDK. However, I used a lot of ideas from their Java and PHP SDK. This project is still in development, so please help contribute if you like it.
 
 ### Introduction 
 

@@ -22,7 +22,6 @@ object GetAdsAccount extends App {
   user.getAdAccounts().map {
     data => {
       println(data)
-      data.foreach(item => println(item.apiContext + ", "  + item.apiRequestFactory))
     }
   }
 }
