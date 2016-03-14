@@ -1,8 +1,12 @@
 package com.fourseasapp.facebookads.model
 
+import com.fourseasapp.facebookads.Cursor
 import com.fourseasapp.facebookads.network.APINode
+import enumeratum.EnumEntry
 import org.cvogt.play.json.Jsonx
 import play.api.libs.json.Format
+
+import scala.concurrent.{Future, ExecutionContext}
 
 /**
   * Created by hailegia on 3/13/2016.
@@ -56,61 +60,71 @@ case class AdAccount(id: String,
                      vertical_name: Option[String]
                     ) extends APINode[AdAccount] {
 
-  override val parentId: String = null
-
   override val endpoint: String = AdAccount.END_POINT
 
-  override def allFields: List[String] = AdAccount.ALL_FIELDS
+  override def allFields: Seq[String] = AdAccount.ALL_FIELDS
 
-  override def defaultReadFields: List[String] = AdAccount.DEFAULT_READ_FIELDS
+  override def defaultReadFields: Seq[String] = AdAccount.DEFAULT_READ_FIELDS
+
+  def getCampaigns(params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Future[Cursor[Campaign]] = {
+    import Campaign._
+    fetchConnections(Campaign.END_POINT, Campaign.ALL_FIELDS, params)
+  }
 }
 
 object AdAccount {
-  object Fields {
-    val ACCOUNT_GROUPS = "account_groups"
-    val ACCOUNT_ID = "account_id"
-    val ACCOUNT_STATUS = "account_status"
-    val AGE = "age"
-    val AGENCY_CLIENT_DECLARATION = "agency_client_declaration"
-    val AMOUNT_SPENT = "amount_spent"
-    val BALANCE = "balance"
-    val BUSINESS = "business"
-    val BUSINESS_CITY = "business_city"
-    val BUSINESS_COUNTRY_CODE = "business_country_code"
-    val BUSINESS_ID = "business_id"
-    val BUSINESS_NAME = "business_name"
-    val BUSINESS_STATE = "business_state"
-    val BUSINESS_STREET2 = "business_street2"
-    val BUSINESS_STREET = "business_street"
-    val BUSINESS_ZIP = "business_zip"
-    val CREATED_TIME = "created_time"
-    val END_ADVERTISER = "end_advertiser"
-    val MEDIA_AGENCY = "media_agency"
-    val PARTNER = "partner"
-    val CAPABILITIES = "capabilities"
-    val CURRENCY = "currency"
-    val ID = "id"
-    val IS_PERSONAL = "is_personal"
-    val NAME = "name"
-    val OFFSITE_PIXELS_TOS_ACCEPTED = "offsite_pixels_tos_accepted"
-    val SPEND_CAP = "spend_cap"
-    val SPEND_CAP_ACTION = "spend_cap_action"
-    val FUNDING_SOURCE = "funding_source"
-    val FUNDING_SOURCE_DETAILS = "funding_source_details"
-    val TIMEZONE_ID = "timezone_id"
-    val TIMEZONE_NAME = "timezone_name"
-    val TIMEZONE_OFFSET_HOURS_UTC = "timezone_offset_hours_utc"
-    val TOS_ACCEPTED = "tos_accepted"
-    val USERS = "users"
-    val TAX_ID_STATUS = "tax_id_status"
-    val ADLABELS = "adlabels"
-    val MIN_DAILY_BUDGET = "min_daily_budget"
-    val MIN_CAMPAIGN_GROUP_SPEND_CAP = "min_campaign_group_spend_cap"
+  import enumeratum._
+
+  sealed trait Fields extends EnumEntry
+
+  object Fields extends Enum[Fields] {
+    val values = findValues
+
+    case object account_groups extends Fields
+    case object account_id extends Fields
+    case object account_status extends Fields
+    case object age extends Fields
+    case object agency_client_declaration extends Fields
+    case object amount_spent extends Fields
+    case object balance extends Fields
+    case object business extends Fields
+    case object business_city extends Fields
+    case object business_country_code extends Fields
+    case object business_id extends Fields
+    case object business_name extends Fields
+    case object business_state extends Fields
+    case object business_street2 extends Fields
+    case object business_street extends Fields
+    case object business_zip extends Fields
+    case object created_time extends Fields
+    case object end_advertiser extends Fields
+    case object media_agency extends Fields
+    case object partner extends Fields
+    case object capabilities extends Fields
+    case object currency extends Fields
+    case object id extends Fields
+    case object is_personal extends Fields
+    case object name extends Fields
+    case object offsite_pixels_tos_accepted extends Fields
+    case object spend_cap extends Fields
+    case object spend_cap_action extends Fields
+    case object funding_source extends Fields
+    case object funding_source_details extends Fields
+    case object timezone_id extends Fields
+    case object timezone_name extends Fields
+    case object timezone_offset_hours_utc extends Fields
+    case object tos_accepted extends Fields
+    case object users extends Fields
+    case object tax_id_status extends Fields
+    case object adlabels extends Fields
+    case object min_daily_budget extends Fields
+    case object min_campaign_group_spend_cap extends Fields
   }
 
   val END_POINT = "adaccounts"
-  val ALL_FIELDS = List(Fields.ACCOUNT_GROUPS, Fields.ACCOUNT_ID, Fields.ACCOUNT_STATUS, Fields.AGE, Fields.AGENCY_CLIENT_DECLARATION, Fields.AMOUNT_SPENT, Fields.BALANCE, Fields.BUSINESS, Fields.BUSINESS_CITY, Fields.BUSINESS_COUNTRY_CODE, Fields.BUSINESS_ID, Fields.BUSINESS_NAME, Fields.BUSINESS_STATE, Fields.BUSINESS_STREET2, Fields.BUSINESS_STREET, Fields.BUSINESS_ZIP, Fields.CREATED_TIME, Fields.END_ADVERTISER, Fields.MEDIA_AGENCY, Fields.PARTNER, Fields.CAPABILITIES, Fields.CURRENCY, Fields.ID, Fields.IS_PERSONAL, Fields.NAME, Fields.OFFSITE_PIXELS_TOS_ACCEPTED, Fields.SPEND_CAP, Fields.SPEND_CAP_ACTION, Fields.FUNDING_SOURCE, Fields.FUNDING_SOURCE_DETAILS, Fields.TIMEZONE_ID, Fields.TIMEZONE_NAME, Fields.TIMEZONE_OFFSET_HOURS_UTC, Fields.TOS_ACCEPTED, Fields.USERS, Fields.TAX_ID_STATUS, Fields.ADLABELS, Fields.MIN_DAILY_BUDGET, Fields.MIN_CAMPAIGN_GROUP_SPEND_CAP)
-  val DEFAULT_READ_FIELDS = List("id", Fields.ACCOUNT_ID, Fields.ACCOUNT_STATUS)
 
-  implicit val adAccountFormat: Format[AdAccount] = Jsonx.formatCaseClass[AdAccount]
+  val ALL_FIELDS = Fields.values.map(v => v.entryName)
+  val DEFAULT_READ_FIELDS = Seq(Fields.account_id.entryName, Fields.account_status.entryName)
+
+  implicit val AdAccountFormat: Format[AdAccount] = Jsonx.formatCaseClass[AdAccount]
 }

@@ -13,7 +13,8 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-core" % "1.1.6",
 
   "net.codingwell" %% "scala-guice" % "4.0.1",
-  "com.google.inject.extensions" % "guice-assistedinject" % "4.0"
-
+  "com.google.inject.extensions" % "guice-assistedinject" % "4.0",
+  "com.beachape" %% "enumeratum" % "1.3.7",
+  "com.beachape" %% "enumeratum-play-json" % "1.3.7"
 )
     

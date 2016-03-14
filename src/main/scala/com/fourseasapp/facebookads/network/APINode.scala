@@ -2,7 +2,7 @@ package com.fourseasapp.facebookads.network
 
 import javax.inject.Inject
 
-import com.fourseasapp.facebookads.APIContext
+import com.fourseasapp.facebookads.{APIException, Cursor, APIContext}
 import play.api.libs.json.{JsValue, Format}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -12,62 +12,48 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 trait APINode[T <: APINode[T]] {
   private var _context: APIContext = null
+  private var _parendId: String = null
+
   @Inject() private var _apiRequestFactory: APIRequestFactory = null
 
   def id: String
 
-  def parentId: String
+  def parentId: String = _parendId
+
+  def parentId_=(value: String) = _parendId = value
 
   def endpoint: String
 
-  def allFields: List[String]
+  def allFields: Seq[String]
 
-  def defaultReadFields: List[String]
+  def defaultReadFields: Seq[String]
 
   def apiContext = _context
 
-  def apiRequestFactory = _apiRequestFactory
-
-  protected[network] def apiContext_=(context: APIContext): Unit = {
+  def apiContext_=(context: APIContext): Unit = {
     _context = context
   }
 
+  def apiRequestFactory = _apiRequestFactory
+
   private[network] def apiRequestFactory_=(value: APIRequestFactory) = _apiRequestFactory = value
 
-  def read(readFields: List[String] = defaultReadFields, params: Map[String, Any] = Map())
+  def read(readFields: Seq[String] = defaultReadFields, params: Map[String, Any] = Map())
           (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, T]] = {
     val request = apiRequestFactory.createAPIRequest(apiContext, apiRequestFactory, id, null, readFields, Map())
     request.get[T](params)
   }
 
-  def fetchConnections[U <: APINode[U]](endpoint: String, readFields: List[String] = List(), params: Map[String, Any] = Map())
-                        (implicit format: Format[U], ec: ExecutionContext): Future[Either[JsValue, (List[U], APIRequest)]] = {
+  def fetchConnections[U <: APINode[U]](endpoint: String, readFields: Seq[String] = List(), params: Map[String, Any] = Map())
+                        (implicit format: Format[U], ec: ExecutionContext): Future[Cursor[U]] = {
     val request = apiRequestFactory.createAPIRequest(apiContext, apiRequestFactory, id, endpoint, readFields, Map())
     request.getList[U](params) map {
-      case Left(x) => Left(x)
-      case Right(list) => Right(list, request)
+      case Left(x) => throw new APIException("Cannot fetch connections. Result: " + x)
+      case Right(list) => new Cursor[U](list, request, params)
     }
   }
 
-  def fetchNextConnections[U <: APINode[U]](request: APIRequest, params: Map[String, Any] = Map())
-                             (implicit format: Format[U], ec: ExecutionContext): Future[Either[JsValue, (List[U], APIRequest)]] = {
-
-    request.getNext[U](params) map {
-      case Left(x) => Left(x)
-      case Right(list) => Right(list, request)
-    }
-  }
-
-  def fetchPrevConnections[U <: APINode[U]](request: APIRequest, params: Map[String, Any] = Map())
-                             (implicit format: Format[U], ec: ExecutionContext): Future[Either[JsValue, (List[U], APIRequest)]] = {
-
-    request.getPrev[U](params) map {
-      case Left(x) => Left(x)
-      case Right(list) => Right(list, request)
-    }
-  }
-
-  def fetchAllConnections[U <: APINode[U]](endpoint: String, readFields: List[String] = List(), params: Map[String, Any] = Map())
+  def fetchAllConnections[U <: APINode[U]](endpoint: String, readFields: Seq[String] = List(), params: Map[String, Any] = Map())
                          (implicit format: Format[U], ec: ExecutionContext): Future[Either[JsValue, List[U]]] = {
     val request = apiRequestFactory.createAPIRequest(apiContext, apiRequestFactory, id, endpoint, readFields, Map())
     fetchAllConnections(params, request, List[U]())

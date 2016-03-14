@@ -13,4 +13,4 @@ This SDK helps you to use Facebook Marketing API easier (without the need to und
 In this project, I used play-ws and their Json library but you can still use it in non-play projects. The reason I choose to do this is because Play provides very nice Http client interface for Scala. Also it's very fast to define Json objects using `case` class. 
 
 ### Usage
-At this stage of development, there's nothing much to explore, you can take a look at `GetAdsAccount.scala` for the idea.
+At this stage of development, there's nothing much to explore, you can take a look at `SimpleSamples.scala` for the idea.

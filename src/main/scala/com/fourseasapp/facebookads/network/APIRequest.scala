@@ -18,10 +18,12 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
                                    @Assisted apiRequestFactory: APIRequestFactory,
                                    @Assisted("nodeId") nodeId: String,
                                    @Assisted("endpoint") endpoint: String,
-                                   @Assisted returnFields: List[String],
+                                   @Assisted returnFields: Seq[String],
                                    @Assisted params: Map[String, Any]) {
 
   private var paging: Paging = null
+
+  private val parentId = if (endpoint != null) nodeId else null
 
   def get[T <: APINode[T]](extraParams: Map[String, Any] = Map())
             (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, T]] = {
@@ -96,6 +98,9 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
         obj => {
           obj.apiContext = apiContext
           obj.apiRequestFactory = apiRequestFactory
+          if (parentId != null) {
+            obj.parentId = parentId
+          }
           Right(obj)
         }
       )
@@ -123,6 +128,9 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
                 data.foreach(obj => {
                   obj.apiContext = apiContext
                   obj.apiRequestFactory = apiRequestFactory
+                  if (parentId != null) {
+                    obj.parentId = parentId
+                  }
                 })
                 Right(data)
               }
@@ -220,6 +228,6 @@ trait APIRequestFactory {
                        @Assisted apiRequestFactory: APIRequestFactory,
                        @Assisted("nodeId") nodeId: String,
                        @Assisted("endpoint") endpoint: String,
-                       @Assisted returnFields: List[String],
+                       @Assisted returnFields: Seq[String],
                        @Assisted params: Map[String, Any]): APIRequest
 }
