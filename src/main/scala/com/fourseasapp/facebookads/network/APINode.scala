@@ -1,11 +1,13 @@
 package com.fourseasapp.facebookads.network
 
+import java.util.Locale
 import javax.inject.Inject
 
 import com.fourseasapp.facebookads.{APIException, Cursor, APIContext}
 import play.api.libs.json.{JsValue, Format}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.runtime.universe._
 
 /**
   * Created by hailegia on 3/12/2016.
@@ -13,6 +15,8 @@ import scala.concurrent.{ExecutionContext, Future}
 trait APINode[T <: APINode[T]] {
   private var _context: APIContext = null
   private var _parendId: String = null
+
+
 
   @Inject() private var _apiRequestFactory: APIRequestFactory = null
 
@@ -22,11 +26,11 @@ trait APINode[T <: APINode[T]] {
 
   def parentId_=(value: String) = _parendId = value
 
-  def endpoint: String
+  def endpoint: String = s"${this.getClass.getSimpleName.toLowerCase(Locale.ENGLISH)}s"
 
   def allFields: Seq[String]
 
-  def defaultReadFields: Seq[String]
+  def defaultReadFields: Seq[String] = allFields
 
   def apiContext = _context
 
@@ -40,13 +44,13 @@ trait APINode[T <: APINode[T]] {
 
   def read(readFields: Seq[String] = defaultReadFields, params: Map[String, Any] = Map())
           (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, T]] = {
-    val request = apiRequestFactory.createAPIRequest(apiContext, apiRequestFactory, id, null, readFields, Map())
-    request.get[T](params)
+    val request = apiRequestFactory.createAPIRequest(apiContext, id, null, APIRequest.METHOD_GET, readFields, Map(), Map())
+    request.execute[T]()(params)
   }
 
   def fetchConnections[U <: APINode[U]](endpoint: String, readFields: Seq[String] = List(), params: Map[String, Any] = Map())
                         (implicit format: Format[U], ec: ExecutionContext): Future[Cursor[U]] = {
-    val request = apiRequestFactory.createAPIRequest(apiContext, apiRequestFactory, id, endpoint, readFields, Map())
+    val request = apiRequestFactory.createAPIRequest(apiContext, id, endpoint, APIRequest.METHOD_GET, readFields, Map(), Map())
     request.getList[U](params) map {
       case Left(x) => throw new APIException("Cannot fetch connections. Result: " + x)
       case Right(list) => new Cursor[U](list, request, params)
@@ -55,7 +59,7 @@ trait APINode[T <: APINode[T]] {
 
   def fetchAllConnections[U <: APINode[U]](endpoint: String, readFields: Seq[String] = List(), params: Map[String, Any] = Map())
                          (implicit format: Format[U], ec: ExecutionContext): Future[Either[JsValue, List[U]]] = {
-    val request = apiRequestFactory.createAPIRequest(apiContext, apiRequestFactory, id, endpoint, readFields, Map())
+    val request = apiRequestFactory.createAPIRequest(apiContext, id, endpoint, APIRequest.METHOD_GET, readFields, Map(), Map())
     fetchAllConnections(params, request, List[U]())
   }
 
@@ -82,4 +86,16 @@ trait APINode[T <: APINode[T]] {
     }
     _id
   }
+}
+
+trait APINodeCompanion[T <: APINode[T]] {
+  val END_POINT: String = s"${this.getClass.getSimpleName.toLowerCase(Locale.ENGLISH)}s"
+
+  implicit val format: Format[T]
+}
+
+object APINode {
+  def classAccessors[T: TypeTag]: List[String] = typeOf[T].members.collect {
+    case m: MethodSymbol if m.isCaseAccessor => m.name.toString
+  }.toList
 }

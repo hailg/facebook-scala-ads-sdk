@@ -1,12 +1,11 @@
 package com.fourseasapp.facebookads.model
 
 import com.fourseasapp.facebookads.Cursor
-import com.fourseasapp.facebookads.network.APINode
-import enumeratum.EnumEntry
+import com.fourseasapp.facebookads.network.{APINode, APINodeCompanion}
 import org.cvogt.play.json.Jsonx
 import play.api.libs.json.Format
 
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by hailegia on 3/13/2016.
@@ -57,14 +56,9 @@ case class AdAccount(id: String,
                      timezone_offset_hours_utc: Option[Float],
                      tos_accepted: Option[Map[String, Int]],
                      user_role: Option[String],
-                     vertical_name: Option[String]
-                    ) extends APINode[AdAccount] {
-
-  override val endpoint: String = AdAccount.END_POINT
+                     vertical_name: Option[String]) extends APINode[AdAccount] {
 
   override def allFields: Seq[String] = AdAccount.ALL_FIELDS
-
-  override def defaultReadFields: Seq[String] = AdAccount.DEFAULT_READ_FIELDS
 
   def getCampaigns(params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Future[Cursor[Campaign]] = {
     import Campaign._
@@ -72,12 +66,12 @@ case class AdAccount(id: String,
   }
 }
 
-object AdAccount {
+object AdAccount extends APINodeCompanion[AdAccount] {
   import enumeratum._
 
   sealed trait Fields extends EnumEntry
 
-  object Fields extends Enum[Fields] {
+  object Fields extends Enum[Fields] with PlayJsonEnum[Fields] {
     val values = findValues
 
     case object account_groups extends Fields
@@ -121,10 +115,7 @@ object AdAccount {
     case object min_campaign_group_spend_cap extends Fields
   }
 
-  val END_POINT = "adaccounts"
-
   val ALL_FIELDS = Fields.values.map(v => v.entryName)
-  val DEFAULT_READ_FIELDS = Seq(Fields.account_id.entryName, Fields.account_status.entryName)
 
-  implicit val AdAccountFormat: Format[AdAccount] = Jsonx.formatCaseClass[AdAccount]
+  override implicit val format: Format[AdAccount] = Jsonx.formatCaseClass[AdAccount]
 }

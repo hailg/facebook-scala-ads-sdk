@@ -3,7 +3,7 @@ package com.fourseasapp.facebookads
 import _root_.net.codingwell.scalaguice.ScalaModule
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import com.fourseasapp.facebookads.network.{APIRequestFactory, APIRequest}
+import com.fourseasapp.facebookads.network.{BatchAPIRequest, APIRequestFactory, APIRequest}
 import com.google.inject.assistedinject.FactoryModuleBuilder
 import com.google.inject.{AbstractModule, Inject, Provider}
 import com.typesafe.config.ConfigFactory
@@ -20,6 +20,7 @@ class FBAdsModule extends AbstractModule with ScalaModule {
   override def configure(): Unit = {
     install(new FactoryModuleBuilder()
       .implement(classOf[APIRequest], classOf[APIRequest])
+      .implement(classOf[BatchAPIRequest], classOf[BatchAPIRequest])
       .build(classOf[APIRequestFactory]))
 
     bind[ActorSystem].toInstance(ActorSystem(classOf[FBAdsModule].getSimpleName))

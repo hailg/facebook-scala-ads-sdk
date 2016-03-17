@@ -10,10 +10,6 @@ import play.api.libs.json.Format
 case class AdLabel(id: String, account: Option[String], name: Option[String],
                    created_time: Option[String], updated_time: Option[String]) extends APINode[AdLabel] {
 
-  override def endpoint: String = AdLabel.END_POINT
-
-  override def defaultReadFields: Seq[String] = AdLabel.DEFAULT_READ_FIELDS
-
   override def allFields: Seq[String] = AdLabel.ALL_FIELDS
 }
 
@@ -22,7 +18,7 @@ object AdLabel {
 
   sealed trait Fields extends EnumEntry
 
-  object Fields extends Enum[Fields] {
+  object Fields extends Enum[Fields] with PlayJsonEnum[Fields] {
     val values = findValues
 
     case object id extends Fields
@@ -35,7 +31,6 @@ object AdLabel {
   val END_POINT = "adlabels"
 
   val ALL_FIELDS = Fields.values.map(v => v.entryName)
-  val DEFAULT_READ_FIELDS = ALL_FIELDS
 
   implicit val AdLabelFormat: Format[AdLabel] = Jsonx.formatCaseClass[AdLabel]
 }

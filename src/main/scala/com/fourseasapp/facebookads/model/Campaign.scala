@@ -11,9 +11,6 @@ case class Campaign(id: String, adlabels: Option[List[AdLabel]], account_id: Opt
                     can_use_spend_cap: Option[String], configured_status: Option[EnumConfiguredStatus], created_time: Option[String],
                     effective_status: Option[EnumCampaignEffectiveStatus], name: Option[String], objective: Option[String],
                     start_time: Option[String], stop_time: Option[String], updated_time: Option[String], spend_cap: Option[String]) extends APINode[Campaign] {
-  override def endpoint: String = Campaign.END_POINT
-
-  override def defaultReadFields: Seq[String] = Campaign.DEFAULT_READ_FIELDS
 
   override def allFields: Seq[String] = Campaign.ALL_FIELDS
 }
@@ -23,7 +20,7 @@ object Campaign {
 
   sealed trait Fields extends EnumEntry
 
-  object Fields extends Enum[Fields] {
+  object Fields extends Enum[Fields] with PlayJsonEnum[Fields] {
     val values = findValues
 
     case object configured_status extends Fields
@@ -47,8 +44,6 @@ object Campaign {
   val END_POINT = "campaigns"
 
   val ALL_FIELDS = Fields.values.map(v => v.entryName)
-  val DEFAULT_READ_FIELDS = ALL_FIELDS
 
-  import AdLabel._
   implicit val CampaignFormat: Format[Campaign] = Jsonx.formatCaseClass[Campaign]
 }
