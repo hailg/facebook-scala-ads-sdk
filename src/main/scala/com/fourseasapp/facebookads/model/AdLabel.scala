@@ -1,6 +1,6 @@
 package com.fourseasapp.facebookads.model
 
-import com.fourseasapp.facebookads.network.APINode
+import com.fourseasapp.facebookads.network.{APINode, APINodeCompanion}
 import org.cvogt.play.json.Jsonx
 import play.api.libs.json.Format
 
@@ -9,28 +9,28 @@ import play.api.libs.json.Format
   */
 case class AdLabel(id: String, account: Option[String], name: Option[String],
                    created_time: Option[String], updated_time: Option[String]) extends APINode[AdLabel] {
+  type Fields = AdLabel.Fields
 
-  override def allFields: Seq[String] = AdLabel.ALL_FIELDS
+  override def companion = AdLabel
 }
 
-object AdLabel {
+object AdLabel extends APINodeCompanion[AdLabel] {
   import enumeratum._
+  import org.cvogt.play.json.Jsonx
+  import play.api.libs.json.Format
 
   sealed trait Fields extends EnumEntry
 
   object Fields extends Enum[Fields] with PlayJsonEnum[Fields] {
     val values = findValues
 
-    case object id extends Fields
-    case object account extends Fields
-    case object name extends Fields
-    case object created_time extends Fields
     case object updated_time extends Fields
+    case object created_time extends Fields
+    case object name extends Fields
+    case object account extends Fields
+    case object id extends Fields
+
   }
 
-  val END_POINT = "adlabels"
-
-  val ALL_FIELDS = Fields.values.map(v => v.entryName)
-
-  implicit val AdLabelFormat: Format[AdLabel] = Jsonx.formatCaseClass[AdLabel]
+  override implicit val format: Format[AdLabel] = Jsonx.formatCaseClass[AdLabel]
 }

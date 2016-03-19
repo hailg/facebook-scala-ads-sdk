@@ -1,9 +1,8 @@
 package com.fourseasapp.facebookads
 
-import _root_.net.codingwell.scalaguice.ScalaModule
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import com.fourseasapp.facebookads.network.{BatchAPIRequest, APIRequestFactory, APIRequest}
+import com.fourseasapp.facebookads.network.{APIRequest, APIRequestFactory, BatchAPIRequest}
 import com.google.inject.assistedinject.FactoryModuleBuilder
 import com.google.inject.{AbstractModule, Inject, Provider}
 import com.typesafe.config.ConfigFactory

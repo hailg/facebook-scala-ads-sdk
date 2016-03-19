@@ -10,16 +10,16 @@ import scala.concurrent.{ExecutionContext, Future}
 /**
   * Created by hailegia on 3/11/2016.
   */
-case class AdUser(id: String = "me") extends APINode[AdUser] {
+case class AdUser(id: String = "me", name: String = null) extends APINode[AdUser] {
+  type Fields = AdUser.Fields
 
-  override def allFields: Seq[String] = null
+  override def companion = AdUser
 
-  override def defaultReadFields: Seq[String] = null
-
-  def getAdAccounts(params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Future[Cursor[AdAccount]] = {
+  def getAdAccounts(params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Cursor[AdAccount] = {
     import AdAccount._
-    fetchConnections(AdAccount.END_POINT, AdAccount.ALL_FIELDS, params)
+    fetchConnections(AdAccount, params = params)
   }
+
 }
 
 object AdUser extends APINodeCompanion[AdUser] {
@@ -35,8 +35,6 @@ object AdUser extends APINodeCompanion[AdUser] {
     case object permissions extends Fields
     case object role extends Fields
   }
-
-  val ALL_FIELDS = Fields.values.map(v => v.entryName)
 
   override implicit val format: Format[AdUser] = Jsonx.formatCaseClass[AdUser]
 }

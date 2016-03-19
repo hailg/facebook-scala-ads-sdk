@@ -1,19 +1,23 @@
 package com.fourseasapp.facebookads
 
 import com.fourseasapp.facebookads.network.{APINode, APIRequest}
-import play.api.libs.json.{JsValue, Format}
+import play.api.libs.json.{Format, JsValue}
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Created by hailegia on 3/14/2016.
   */
-class Cursor[T <: APINode[T]](firstItems: List[T], apiRequest: APIRequest, params: Map[String, Any])
+class Cursor[T <: APINode[T]](apiRequest: APIRequest)
                           (implicit format: Format[T], ec: ExecutionContext) {
-  var currentItems = firstItems
-  var index = 0
+  private var currentItems = List[T]()
+  private var index = 0
+  private var started = false
 
-  def hasNext: Boolean = index < currentItems.size || (index == currentItems.size && apiRequest.canGoNext)
+  def size: Option[Int] = apiRequest.totalResultCount
+
+  def hasNext: Boolean = !started || index < currentItems.size || (index == currentItems.size && apiRequest.canGoNext)
 
   def next(): Future[T] = {
     if (index < currentItems.size) {
@@ -21,9 +25,10 @@ class Cursor[T <: APINode[T]](firstItems: List[T], apiRequest: APIRequest, param
       index += 1
       Future(currentItems(curIndex))
     } else {
-      apiRequest.getNext(params) map {
+      apiRequest.getNext() map {
         case Left(x) => throw new APIException("Cannot read next on cursor. Read value: " + x)
         case Right(list) => {
+          started = true
           currentItems = list
           index = 1
           currentItems(0)
@@ -42,15 +47,23 @@ class Cursor[T <: APINode[T]](firstItems: List[T], apiRequest: APIRequest, param
   }
 
   private def _fetchRemaining(fetchedItems: List[T]): Future[List[T]] = {
-    if (!apiRequest.canGoNext) {
-      Future(fetchedItems)
-    } else {
-      apiRequest.getNext(params) flatMap {
+    if (!started) {
+      apiRequest.getList() flatMap {
+        case Left(x) => Future.failed(throw new APIException("Cannot read next on cursor. Read value: " + x))
+        case Right(list) => {
+          started = true
+          _fetchRemaining(fetchedItems ++ list)
+        }
+      }
+    } else if (apiRequest.canGoNext) {
+      apiRequest.getNext() flatMap {
         case Left(x) => Future.failed(throw new APIException("Cannot read next on cursor. Read value: " + x))
         case Right(list) => {
           _fetchRemaining(fetchedItems ++ list)
         }
       }
+    } else {
+      Future(fetchedItems)
     }
   }
 

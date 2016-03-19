@@ -4,13 +4,13 @@ import java.io.File
 import java.net.URLEncoder
 import java.util.Locale
 import java.util.function.BiConsumer
+import javax.annotation.Nullable
 
-import com.fourseasapp.facebookads.{APIException, APIContext}
+import com.fourseasapp.facebookads.{APIContext, APIException, Mappable}
 import com.google.inject.assistedinject.{Assisted, AssistedInject}
 import org.slf4j.LoggerFactory
-import org.asynchttpclient.{Response, RequestBuilder, AsyncHttpClient}
-import org.asynchttpclient.request.body.multipart.{StringPart, FilePart}
-
+import org.asynchttpclient.{AsyncHttpClient, RequestBuilder, Response}
+import org.asynchttpclient.request.body.multipart.{FilePart, StringPart}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import play.api.libs.ws.ahc.AhcWSResponse
@@ -18,7 +18,7 @@ import play.api.libs.ws.{WSClient, WSResponse}
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import scala.concurrent.{Promise, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /**
   * Created by hailegia on 3/12/2016.
@@ -26,14 +26,15 @@ import scala.concurrent.{Promise, ExecutionContext, Future}
 class APIRequest @AssistedInject()(wsClient: WSClient,
                                    apiRequestFactory: APIRequestFactory,
                                    @Assisted apiContext: APIContext,
-                                   @Assisted("nodeId") nodeId: String,
-                                   @Assisted("endpoint") endpoint: String,
+                                   @Nullable @Assisted("nodeId") nodeId: String,
+                                   @Nullable @Assisted("endpoint") endpoint: String,
                                    @Assisted("method") method: String,
                                    @Assisted returnFields: Seq[String],
                                    @Assisted params: Map[String, Any],
                                    @Assisted files: Map[String, File]) {
 
-  private var paging: Paging = null
+  private var _totalResultCount:Option[Int] = None
+  private var paging: Option[Paging] = None
 
   private val parentId = if (endpoint != null) nodeId else null
 
@@ -42,7 +43,9 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
     callInternalList(APIRequest.METHOD_GET, extraParams)
   }
 
-  def canGoNext = paging != null && paging.next.isDefined
+  def totalResultCount = _totalResultCount
+
+  def canGoNext = paging.isDefined && paging.get.next.isDefined
 
   def getNext[T <: APINode[T]](extraParams: Map[String, Any] = Map())
                 (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, List[T]]] = {
@@ -52,31 +55,14 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
       if (extraParams != null) {
         nextExtraParams ++= extraParams
       }
-      nextExtraParams += "after" -> paging.cursors.after
+      nextExtraParams += "after" -> paging.get.cursors.after
       callInternalList(APIRequest.METHOD_GET, nextExtraParams)
     } else {
       Future(Right(List()))
     }
   }
 
-  def canGoPrev = paging != null && paging.previous.isDefined
-
-  def getPrev[T <: APINode[T]](extraParams: Map[String, Any] = Map())
-                (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, List[T]]] = {
-
-    if (canGoPrev) {
-      var prevExtraParams = Map[String, Any]()
-      if (extraParams != null) {
-        prevExtraParams ++= extraParams
-      }
-      prevExtraParams += "before" -> paging.cursors.before
-      callInternalList(APIRequest.METHOD_GET, prevExtraParams)
-    } else {
-      Future(Right(List()))
-    }
-  }
-
-  def execute[T <: APINode[T]]()(extraParams: Map[String, Any] = Map())
+  def execute[T <: APINode[T]](extraParams: Map[String, Any] = Map())
                               (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, T]] = {
     callInternal(method, extraParams)
   }
@@ -124,27 +110,23 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
 
     result map {
       wsResponse =>
-        (wsResponse.json \ "paging").validate[Paging].fold(
-          _ => Left(wsResponse.json),
-          obj => {
-            paging = obj
-            (wsResponse.json \ "data").validate[List[T]].fold(
-              invalid => {
-                APIRequest.logger.error(invalid.toString())
-                APIRequest.logger.error(Json.stringify(wsResponse.json))
-                Left(wsResponse.json)
-              },
-              data => {
-                data.foreach(obj => {
-                  obj.apiContext = apiContext
-                  obj.apiRequestFactory = apiRequestFactory
-                  if (parentId != null) {
-                    obj.parentId = parentId
-                  }
-                })
-                Right(data)
+        paging = (wsResponse.json \ "paging").validate[Paging].asOpt
+        _totalResultCount = (wsResponse.json \ "summary" \ "total_count").validate[Int].asOpt
+        (wsResponse.json \ "data").validate[List[T]].fold(
+          invalid => {
+            APIRequest.logger.error(invalid.toString())
+            APIRequest.logger.error(Json.stringify(wsResponse.json))
+            Left(wsResponse.json)
+          },
+          data => {
+            data.foreach(obj => {
+              obj.apiContext = apiContext
+              obj.apiRequestFactory = apiRequestFactory
+              if (parentId != null) {
+                obj.parentId = parentId
               }
-            )
+            })
+            Right(data)
           }
         )
     }
@@ -223,7 +205,7 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
     if (apiContext.hasAppSecret) {
       result += ("appsecret_proof" -> apiContext.getAppSecretProof())
     }
-    if (returnFields != null) {
+    if (returnFields != null && returnFields.size > 0) {
       result += ("fields" -> returnFields.mkString(","))
     }
 
@@ -244,64 +226,101 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
     return nodeId
   }
 
-  def getBatchInfo(): BatchRequestInfo = {
+  def getBatchInfo[T <: APINode[T]](): BatchRequestInfo[T] = {
     var allParams = Map[String, Any]()
     if (params != null) {
       allParams ++= params
     }
-    if (returnFields != null) {
+    if (returnFields != null && returnFields.size > 0) {
       allParams += ("fields" -> returnFields.mkString(","))
     }
     val filesMap = allParams.filter(p => p._2.isInstanceOf).mapValues(f => f.asInstanceOf[File])
     val bodies = for {p <- allParams } yield (p._1 + "=" + URLEncoder.encode(p._2.toString, "UTF-8"))
-    BatchRequestInfo(method, getApiUrl(), bodies.mkString("&"), filesMap)
+    val relativeUrl = method match {
+      case APIRequest.METHOD_POST =>s"$nodeId/$endpoint"
+      case _ => nodeId
+    }
+    BatchRequestInfo[T](method, relativeUrl, bodies.mkString("&"), parentId, apiRequestFactory, apiContext, filesMap, Promise[T]())
   }
 }
 
 class BatchAPIRequest @AssistedInject()(apiRequestFactory: APIRequestFactory, @Assisted() context: APIContext) {
-  var requests: Seq[APIRequest] = Seq()
+  var requests: Seq[BatchRequestInfo[_]] = Seq()
 
-  def addRequest(request: APIRequest): Unit = {
-    requests = request +: requests
+  def addRequest[T <: APINode[T]](request: APIRequest): Future[T] = {
+    val requestInfo = request.getBatchInfo[T]()
+    requests = requestInfo +: requests
+    requestInfo.promise.future
   }
 
-  def execute[T <: APINode[T]]()(extraParams: Map[String, Any] = Map())
-                              (implicit format: Format[T], ec: ExecutionContext): Future[List[Either[APIException, T]]] = {
+  def execute[T <: APINode[T]](extraParams: Map[String, Any] = Map())
+                              (implicit format: Format[T], m: Mappable[T], ec: ExecutionContext): Future[List[Either[JsValue, T]]] = {
     var allFiles = Map[String, File]()
-    val batch = requests.map(request => {
-      val info = request.getBatchInfo()
+    var batch = Json.arr()
+    requests.foreach(info => {
       var element = Json.obj("method" -> info.method, "relative_url" -> info.relativePath)
       if (info.body != null) {
         element = element + ("body", JsString(info.body))
       }
-      if (info.files != null) {
+      if (info.files != null && info.files.size > 0) {
         element = element + ("attached_files", JsString(info.files.keys.mkString(",")))
         allFiles ++= info.files
       }
-      element
+      batch = batch.append(element)
     })
-    val request = apiRequestFactory.createAPIRequest(context, null, null, null, null, Map("batch" -> batch), allFiles)
-    request.callRaw(APIRequest.METHOD_POST).map {case JsArray(allResponses)=> {
-      var results = ListBuffer[Either[APIException, T]]()
-      for (response <- allResponses) {
-        if (response == JsNull) {
-          results += null
-        } else {
-          val code = (response \ "code").get.as[Int]
-          if (code == 200) {
-            results += Right((response \ "body").get.as[T])
+
+    val request = apiRequestFactory.createAPIRequest(context, null, null, APIRequest.METHOD_POST, List(), Map("batch" -> batch), allFiles)
+    request.callRaw(APIRequest.METHOD_POST).map {
+      case JsArray(allResponses) => {
+        var results = ListBuffer[Either[JsValue, T]]()
+        var index = 0
+        for (response <- allResponses) {
+          val requestInfo = requests(index)
+          index += 1
+          if (response == JsNull) {
+            results += null
+            requestInfo.success(null)
           } else {
-            results += Left(new APIException(response.toString()))
+            val code = (response \ "code").get.as[Int]
+            var node: Either[JsValue, T] = Left(response)
+            if (code == 200) {
+              (response \ "body").asOpt[String] foreach {body =>
+                val bodyJson = Json.parse(body)
+                bodyJson.validate[T].fold(
+                  _ => (bodyJson \ "id").asOpt[String] foreach {id =>
+                    node = Right(APINode.materialize(Map[String, Any]("id" -> id)))
+                  },
+                  x => node = Right(x)
+                )
+              }
+            }
+            results += node
+            node match {
+              case Left(_) => requestInfo.promise.failure(new APIException(response.toString()))
+              case Right(nodeValue) => {
+                nodeValue.apiContext = requestInfo.apiContext
+                nodeValue.apiRequestFactory = requestInfo.apiRequestFactory
+                if (requestInfo.parentId != null) {
+                  nodeValue.parentId = requestInfo.parentId
+                }
+                requestInfo.success(nodeValue)
+              }
+            }
           }
         }
+        results.toList
       }
-      results.toList
-    }}
+      case x => throw new APIException(x.toString())
+    }
   }
 
 }
 
-case class BatchRequestInfo(method: String, relativePath: String, body: String, files: Map[String, File])
+case class BatchRequestInfo[T <: APINode[T]](method: String, relativePath: String, body: String, parentId: String,
+                                             apiRequestFactory: APIRequestFactory, apiContext: APIContext,
+                                             files: Map[String, File], promise: Promise[T]) {
+  def success(x: Any) = promise.success(x.asInstanceOf[T])
+}
 
 case class PagingCursor(after: String, before: String)
 
@@ -350,5 +369,5 @@ trait APIRequestFactory {
                        @Assisted params: Map[String, Any],
                        @Assisted files: Map[String, File]): APIRequest
 
-  def createAPIBatchRequest(apiContext: APIContext)
+  def createAPIBatchRequest(apiContext: APIContext): BatchAPIRequest
 }
