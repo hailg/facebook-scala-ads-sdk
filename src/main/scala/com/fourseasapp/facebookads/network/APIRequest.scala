@@ -19,6 +19,7 @@ import play.api.libs.ws.{WSClient, WSResponse}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.reflect.runtime.universe._
 
 /**
   * Created by hailegia on 3/12/2016.
@@ -62,7 +63,7 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
     }
   }
 
-  def execute[T <: APINode[T]](extraParams: Map[String, Any] = Map())
+  def execute[T](extraParams: Map[String, Any] = Map())
                               (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, T]] = {
     callInternal(method, extraParams)
   }
@@ -79,7 +80,7 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
     new APIRequest(wsClient, apiRequestFactory, apiContext, nodeId, endpoint, method, newReturnFields, params, files)
   }
 
-  private def callInternal[T <: APINode[T]](method: String, extraParams: Map[String, Any])
+  private def callInternal[T](method: String, extraParams: Map[String, Any])
                              (implicit format: Format[T], ec: ExecutionContext): Future[Either[JsValue, T]]  = {
 
     val result: Future[WSResponse] = prepareRequest(method, extraParams)
@@ -88,12 +89,17 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
         wsResponse.json.validate[T].fold(
         invalid => Left(wsResponse.json),
         obj => {
-          obj.apiContext = apiContext
-          obj.apiRequestFactory = apiRequestFactory
-          if (parentId != null) {
-            obj.parentId = parentId
+          if (obj.isInstanceOf[APINode[_]]) {
+            val resultObj = obj.asInstanceOf[APINode[_]]
+            resultObj.apiContext = apiContext
+            resultObj.apiRequestFactory = apiRequestFactory
+            if (parentId != null) {
+              resultObj.parentId = parentId
+            }
+            Right(resultObj.asInstanceOf[T])
+          } else {
+            Right(obj)
           }
-          Right(obj)
         }
       )
     }
@@ -222,10 +228,6 @@ class APIRequest @AssistedInject()(wsClient: WSClient,
     }
   }
 
-  def getNodePath(): String = {
-    return nodeId
-  }
-
   def getBatchInfo[T <: APINode[T]](): BatchRequestInfo[T] = {
     var allParams = Map[String, Any]()
     if (params != null) {
@@ -320,6 +322,15 @@ case class BatchRequestInfo[T <: APINode[T]](method: String, relativePath: Strin
                                              apiRequestFactory: APIRequestFactory, apiContext: APIContext,
                                              files: Map[String, File], promise: Promise[T]) {
   def success(x: Any) = promise.success(x.asInstanceOf[T])
+}
+
+case class CUDResponse(id: Option[String], success: Option[Boolean])
+
+object CUDResponse {
+  implicit val CUDResponseFormat: Format[CUDResponse] = (
+      (JsPath \ "id").formatNullable[String] and
+      (JsPath \ "success").formatNullable[Boolean]
+    )(CUDResponse.apply, unlift(CUDResponse.unapply))
 }
 
 case class PagingCursor(after: String, before: String)

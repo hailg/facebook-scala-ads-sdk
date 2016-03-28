@@ -20,6 +20,7 @@ object EnumConfiguredStatus extends Enum[EnumConfiguredStatus] with PlayJsonEnum
   case object DELETED extends EnumConfiguredStatus
   case object ARCHIVED extends EnumConfiguredStatus
 }
+
 sealed trait EnumCampaignEffectiveStatus extends EnumEntry
 
 object EnumCampaignEffectiveStatus extends Enum[EnumCampaignEffectiveStatus] with PlayJsonEnum[EnumCampaignEffectiveStatus] {
@@ -37,7 +38,37 @@ object EnumCampaignEffectiveStatus extends Enum[EnumCampaignEffectiveStatus] wit
   case object ADSET_PAUSED extends EnumCampaignEffectiveStatus
 }
 
-object Enums {
-//  implicit val EnumConfiguredStatusFormat: Format[EnumConfiguredStatus] = Jsonx.formatAuto[EnumConfiguredStatus]
-//  implicit val EnumCampaignEffectiveStatusFormat: Format[EnumCampaignEffectiveStatus] = Jsonx.formatAuto[EnumCampaignEffectiveStatus]
+sealed trait EnumCampaignObjective extends EnumEntry
+
+object EnumCampaignObjective extends Enum[EnumCampaignObjective] with PlayJsonEnum[EnumCampaignObjective] {
+  val values = findValues
+
+  case object BRAND_AWARENESS extends EnumCampaignObjective
+  case object CANVAS_APP_ENGAGEMENT extends EnumCampaignObjective
+  case object CANVAS_APP_INSTALLS extends EnumCampaignObjective
+  case object EVENT_RESPONSES extends EnumCampaignObjective
+  case object LEAD_GENERATION extends EnumCampaignObjective
+  case object LOCAL_AWARENESS extends EnumCampaignObjective
+  case object MOBILE_APP_ENGAGEMENT extends EnumCampaignObjective
+  case object MOBILE_APP_INSTALLS extends EnumCampaignObjective
+  case object NONE extends EnumCampaignObjective
+  case object OFFER_CLAIMS extends EnumCampaignObjective
+  case object PAGE_LIKES extends EnumCampaignObjective
+  case object POST_ENGAGEMENT extends EnumCampaignObjective
+  case object LINK_CLICKS extends EnumCampaignObjective
+  case object CONVERSIONS extends EnumCampaignObjective
+  case object VIDEO_VIEWS extends EnumCampaignObjective
+  case object PRODUCT_CATALOG_SALES extends EnumCampaignObjective
+}
+
+sealed trait EnumBidInfo extends EnumEntry
+
+object EnumBidInfo extends Enum[EnumBidInfo] with PlayJsonEnum[EnumBidInfo] {
+  val values = findValues
+
+  case object ACTIONS extends EnumBidInfo
+  case object CLICKS extends EnumBidInfo
+  case object IMPRESSIONS extends EnumBidInfo
+  case object REACH extends EnumBidInfo
+  case object SOCIAL extends EnumBidInfo
 }

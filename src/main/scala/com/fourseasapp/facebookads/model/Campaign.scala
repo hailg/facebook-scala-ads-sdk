@@ -1,6 +1,7 @@
 package com.fourseasapp.facebookads.model
 
 import com.fourseasapp.facebookads.network.{APINode, APINodeCompanion}
+import enumeratum.EnumEntry
 
 /**
   * Created by hailegia on 3/14/2016.

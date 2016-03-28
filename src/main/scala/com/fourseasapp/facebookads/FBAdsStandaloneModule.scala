@@ -15,21 +15,21 @@ import play.api.{Configuration, Environment, Mode}
 /**
   * Created by hailegia on 3/11/2016.
   */
-class FBAdsModule extends AbstractModule with ScalaModule {
+class FBAdsStandaloneModule extends AbstractModule with ScalaModule {
   override def configure(): Unit = {
     install(new FactoryModuleBuilder()
       .implement(classOf[APIRequest], classOf[APIRequest])
       .implement(classOf[BatchAPIRequest], classOf[BatchAPIRequest])
       .build(classOf[APIRequestFactory]))
 
-    bind[ActorSystem].toInstance(ActorSystem(classOf[FBAdsModule].getSimpleName))
+    bind[ActorSystem].toInstance(ActorSystem(classOf[FBAdsStandaloneModule].getSimpleName))
     bind[WSClient].toProvider[WSClientProvider].in[javax.inject.Singleton]
   }
 }
 
 class WSClientProvider @Inject() (system: ActorSystem) extends Provider[WSClient] {
   override def get(): WSClient = {
-    val materializer = ActorMaterializer(namePrefix = Some(classOf[FBAdsModule].getSimpleName))(system)
+    val materializer = ActorMaterializer(namePrefix = Some(classOf[FBAdsStandaloneModule].getSimpleName))(system)
 
     val configuration = Configuration.reference ++ Configuration(ConfigFactory.parseString(
       """

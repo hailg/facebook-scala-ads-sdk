@@ -5,6 +5,7 @@ import java.util.Locale
 import javax.inject.Inject
 
 import com.fourseasapp.facebookads._
+import enumeratum.EnumEntry
 import play.api.libs.json.{Format, JsValue}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -14,7 +15,7 @@ import scala.reflect.runtime.universe._
   * Created by hailegia on 3/12/2016.
   */
 trait APINode[T <: APINode[T]] { self: T =>
-  type Fields
+  type Fields <: EnumEntry
 
   private var _context: APIContext = null
   private var _parentId: String = null
@@ -33,7 +34,11 @@ trait APINode[T <: APINode[T]] { self: T =>
 
   def apiContext_=(context: APIContext) = _context = context
 
-  def copy(fields: Map[Fields, Any])(implicit m: Mappable[T]): T = {
+  def apiRequestFactory_=(value: APIRequestFactory) = _apiRequestFactory = value
+
+  def apiRequestFactory = _apiRequestFactory
+
+  def set(fields: Map[Fields, Any])(implicit m: Mappable[T]): T = {
     if (props == null) {
       props = new PropsContainer(APINode.mapify(this))
     }
@@ -48,7 +53,7 @@ trait APINode[T <: APINode[T]] { self: T =>
     newInstance
   }
 
-  def copy(fields: (Fields, Any)*)(implicit m: Mappable[T]): T = {
+  def set(fields: (Fields, Any)*)(implicit m: Mappable[T]): T = {
     if (props == null) {
       props = new PropsContainer(APINode.mapify(this))
     }
@@ -63,8 +68,8 @@ trait APINode[T <: APINode[T]] { self: T =>
     newInstance
   }
 
-  def create(params: Map[String, Any] = Map(), files: Map[String, File] = Map(), batchAPIRequest: BatchAPIRequest = null)
-            (implicit format: Format[T], typeTag: TypeTag[T], m: Mappable[T], ec: ExecutionContext): Future[T] = {
+  def create(batchAPIRequest: BatchAPIRequest = null, params: Map[String, Any] = Map(), files: Map[String, File] = Map(), validating: Boolean = false)
+            (implicit format: Format[T], typeTag: TypeTag[T], m: Mappable[T], ec: ExecutionContext): Future[Option[T]] = {
     if (id != null) {
       return Future.failed(new CRUDException(s"$this has been created before."))
     }
@@ -81,23 +86,87 @@ trait APINode[T <: APINode[T]] { self: T =>
                     .createAPIRequest(apiContext, parentId, companion.END_POINT, APIRequest.METHOD_POST, companion.allFields, sentParams, files)
     if (batchAPIRequest != null) {
       batchAPIRequest.addRequest(request)
-      Future.successful(this)
+    } else {
+      request.execute[CUDResponse]() map {
+        case Left(x) => throw new APIException("Cannot read return object from " + x)
+        case Right(v) => if (validating) {
+          Some(this)
+        } else {
+          v.id map {id =>
+            injectObjectId(id)
+          }
+        }
+      }
+    }
+  }
+
+  def read(batchAPIRequest: BatchAPIRequest = null, readFields: Seq[String] = List(), params: Map[String, Any] = Map())
+          (implicit format: Format[T], typeTag: TypeTag[T], ec: ExecutionContext): Future[T] = {
+    val sentFields = if (readFields == null || readFields.isEmpty) companion.defaultReadFields else readFields
+    val request = apiRequestFactory.createAPIRequest(apiContext, id, null, APIRequest.METHOD_GET, sentFields, params, Map())
+    if (batchAPIRequest != null) {
+      batchAPIRequest.addRequest(request)
     } else {
       request.execute[T]() map {
-        case Left(x) => throw new APIException("Cannot read object from " + x)
+        case Left(x) => throw new APIException("Cannot read return object from " + x)
         case Right(v) => v
       }
     }
-
   }
 
-  def read(readFields: Seq[String] = null, params: Map[String, Any] = Map())
-          (implicit format: Format[T], typeTag: TypeTag[T], ec: ExecutionContext): Future[T] = {
-    val sentFields = if (readFields == null) companion.defaultReadFields else readFields
-    val request = apiRequestFactory.createAPIRequest(apiContext, id, null, APIRequest.METHOD_GET, sentFields, params, Map())
-    request.execute[T]() map {
-      case Left(x) => throw new APIException("Cannot read object from " + x)
-      case Right(v) => v
+  def update(batchAPIRequest: BatchAPIRequest = null, params: Map[String, Any] = Map(), files: Map[String, File] = Map(), validating: Boolean = false)
+            (implicit format: Format[T], typeTag: TypeTag[T], m: Mappable[T], ec: ExecutionContext): Future[Option[T]] = {
+    if (id == null) {
+      return Future.failed(new CRUDException(s"$this object need to be created first."))
+    }
+
+    var sentParams: Map[String, Any] = Map()
+    if (params != null) {
+      sentParams ++= params
+    }
+    sentParams ++= this.exportData
+
+    val request = apiRequestFactory
+      .createAPIRequest(apiContext, id, null, APIRequest.METHOD_POST, companion.allFields, sentParams, files)
+    if (batchAPIRequest != null) {
+      batchAPIRequest.addRequest(request)
+    } else {
+      request.execute[CUDResponse]() map {
+        case Left(x) => throw new APIException("Cannot read return object from " + x)
+        case Right(v) => v.success match {
+          case Some(true) =>
+            if (!validating) {
+              this.props.clearHistory()
+            }
+            Some(this)
+          case _ => None
+        }
+      }
+    }
+  }
+
+  def delete(batchAPIRequest: BatchAPIRequest = null, params: Map[String, Any] = Map())
+          (implicit format: Format[T], typeTag: TypeTag[T], ec: ExecutionContext): Future[Option[Boolean]] = {
+    if (id == null) {
+      return Future.failed(new CRUDException(s"$this object need to be created first."))
+    }
+    val request = apiRequestFactory.createAPIRequest(apiContext, id, null, APIRequest.METHOD_DELETE, List(), params, Map())
+    if (batchAPIRequest != null) {
+      batchAPIRequest.addRequest(request)
+    } else {
+      request.execute[CUDResponse]() map {
+        case Left(x) => throw new APIException("Cannot read return object from " + x)
+        case Right(v) => v.success
+      }
+    }
+  }
+
+  def save(batchAPIRequest: BatchAPIRequest = null, params: Map[String, Any] = Map(), files: Map[String, File] = Map(), validating: Boolean = false)
+          (implicit format: Format[T], typeTag: TypeTag[T], m: Mappable[T], ec: ExecutionContext): Future[Option[T]] = {
+    if (id != null) {
+      update(batchAPIRequest, params, files, validating)
+    } else {
+      create(batchAPIRequest, params, files, validating)
     }
   }
 
@@ -118,6 +187,10 @@ trait APINode[T <: APINode[T]] { self: T =>
     fetchAllConnections(params, request, List[U]())
   }
 
+  def toStringAll(): String = {
+    s"""info = ${this.toString}, context = $apiContext, parentId = $parentId, requestFactory = $apiRequestFactory"""
+  }
+
   private def fetchAllConnections[U <: APINode[U]](params: Map[String, Any], request: APIRequest, currentResults: List[U])
                             (implicit format: Format[U], typeTag: TypeTag[U], ec: ExecutionContext): Future[Either[JsValue, List[U]]] = {
 
@@ -134,10 +207,16 @@ trait APINode[T <: APINode[T]] { self: T =>
     }
   }
 
-  private[network] def apiRequestFactory_=(value: APIRequestFactory) = _apiRequestFactory = value
-
-  private[network] def apiRequestFactory = _apiRequestFactory
-
+  private def injectObjectId(id: String)(implicit m: Mappable[T]): T = {
+    val currentData = APINode.mapify(this)
+    val newData = currentData + ("id" -> id)
+    val result = APINode.materialize[T](newData)
+    result.apiContext = this.apiContext
+    result.apiRequestFactory = this.apiRequestFactory
+    result.parentId = this.parentId
+    result.props = new PropsContainer(newData)
+    result
+  }
   private def exportData(implicit m: Mappable[T]): Map[String, Any] = {
     if (props == null) {
       props = new PropsContainer(APINode.mapify(this))
@@ -151,7 +230,6 @@ trait APINode[T <: APINode[T]] { self: T =>
   }
 
   def companion: APINodeCompanion[T]
-
 }
 
 trait APINodeCompanion[T <: APINode[T]] {
