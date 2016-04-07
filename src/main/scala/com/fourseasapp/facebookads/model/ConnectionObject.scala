@@ -35,7 +35,7 @@ object ConnectionObject extends APINodeCompanion[ConnectionObject] {
   val PAGE = 6
   val PLACE = 1
 
-  
+
   sealed trait Fields extends EnumEntry
 
   object Fields extends Enum[Fields] with PlayJsonEnum[Fields] {

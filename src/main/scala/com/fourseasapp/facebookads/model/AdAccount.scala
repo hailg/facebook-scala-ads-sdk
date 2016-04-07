@@ -53,22 +53,32 @@ case class AdAccount (id: String,
                      timezone_name: Option[String] = None,
                      timezone_offset_hours_utc: Option[Float] = None,
                      tos_accepted: Option[Map[String, Int]] = None,
-                     user_role: Option[String] = None,
-                     vertical_name: Option[String] = None) extends APINode[AdAccount] {
+                     user_role: Option[String] = None) extends APINode[AdAccount] {
 
   type Fields = AdAccount.Fields
 
   override def companion = AdAccount
 
-  def getCampaigns(params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Cursor[Campaign] = {
+  def getCampaigns(fields: Seq[String] = List(), params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Cursor[Campaign] = {
     import Campaign._
-    fetchConnections(Campaign, params = params)
+    fetchConnections(Campaign, readFields = fields, params = params)
   }
 
-  def getConnectionObjects(params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Cursor[ConnectionObject] = {
+  def getConnectionObjects(fields: Seq[String] = List(), params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Cursor[ConnectionObject] = {
     import ConnectionObject._
-    fetchConnections(ConnectionObject, params = params)
+    fetchConnections(ConnectionObject, readFields = fields, params = params)
   }
+
+  def getCustomConversions(fields: Seq[String] = List(), params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Cursor[CustomConversion] = {
+    import CustomConversion._
+    fetchConnections(CustomConversion, readFields = fields, params = params)
+  }
+
+  def getAdsPixels(fields: Seq[String] = List(), params: Map[String, Any] = Map())(implicit ec: ExecutionContext): Cursor[AdsPixel] = {
+    import AdsPixel._
+    fetchConnections(AdsPixel, readFields = fields, params = params)
+  }
+
 }
 
 object AdAccount extends APINodeCompanion[AdAccount] {
@@ -81,7 +91,6 @@ object AdAccount extends APINodeCompanion[AdAccount] {
   object Fields extends Enum[Fields] with PlayJsonEnum[Fields] {
     val values = findValues
 
-    case object vertical_name extends Fields
     case object user_role extends Fields
     case object tos_accepted extends Fields
     case object timezone_offset_hours_utc extends Fields

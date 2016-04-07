@@ -16,7 +16,7 @@ import scala.concurrent.Future
 object SimpleSamples extends App {
 //  println(Util.generateAPINodeCompanion[AdLabel])
 
-  val ACCESS_TOKEN = "CAAXwYOmSoHEBAGFmDTLZB1DQJOaxPvrjOe4DJCIuhzVOhhAwNo3vhJvPXUB0eD7TmTxZAUXQijLDBubhblw3xmk3FPFJ6gaJpmD973eoZCxbb6D3dcEQ6rewjdjWo5j2MGi08sZAYJeJ3cTvMFUzpG6HkdCgOLg2O1oRKZAx27RmpV5UyVNwglvepp3CnZAO6V4FUFxYufwQZDZD"
+  val ACCESS_TOKEN = ""
   val APP_SECRET = "2d73cce33da8365788fb9938a204f286"
 
   val injector = Guice.createInjector(new FBAdsStandaloneModule)
@@ -109,5 +109,12 @@ object SimpleSamples extends App {
       }))
   }
 
-  crudCampaign()
+  def getAdPixels(): Unit = {
+    val accountsFuture = user.getAdAccounts().fetchRemaining()
+    accountsFuture.map {accounts =>
+      accounts(0).getAdsPixels().fetchRemaining().map(println _)
+    }
+  }
+
+  getAdPixels()
 }
